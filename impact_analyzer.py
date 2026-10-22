@@ -2,7 +2,7 @@ import os
 import sys
 import sqlite3
 import subprocess
-
+import html as html_lib
 # 数据库路径（确保在当前项目目录下）
 DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "code_graph.db"
@@ -96,5 +96,41 @@ def main():
     print(f"变更行数: {changed_lines}")
     print(f"最终评级: {risk_level}")
 
+def generate_html_report(changed_func_name, callers, upstream_files, risk_level, changed_lines):
+    """生成自包含的 HTML 影响面分析报告"""
+    caller_rows = "".join([f"<tr><td>{c[0]}</td><td>{c[1]}</td></tr>" for c in callers]) or "<tr><td colspan='2'>暂无上游调用方</td></tr>"
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>影响面分析报告 - {changed_func_name}</title>
+        <style>
+            body {{ font-family: sans-serif; padding: 20px; }}
+            table {{ border-collapse: collapse; width: 100%; margin-top: 10px; }}
+            th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+            .high {{ color: red; font-weight: bold; }}
+            .low {{ color: green; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <h1>🔥 影响面分析报告</h1>
+        <p>变更函数：<b>{changed_func_name}</b></p>
+        <h3>调用方列表</h3>
+        <table><tr><th>函数名</th><th>文件路径</th></tr>{caller_rows}</table>
+        <h3>风险评级</h3>
+        <p>调用方数量：{len(callers)}</p>
+        <p>变更行数：{changed_lines}</p>
+        <p>最终评级：<span class="{'high' if '高' in risk_level else 'low'}">{risk_level}</span></p>
+    </body>
+    </html>
+    """
+    with open("impact_report.html", "w", encoding="utf-8") as f:
+        f.write(html_content)
+    print("✅ HTML 报告已生成：impact_report.html")
+
+# 在 main() 函数的最末尾调用：
+# generate_html_report(changed_func_name, callers, upstream_files, risk_level, changed_lines)
 if __name__ == "__main__":
     main()
