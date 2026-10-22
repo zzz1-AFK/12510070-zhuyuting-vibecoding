@@ -2,11 +2,12 @@ import os
 import sys
 import sqlite3
 import subprocess
-import html as html_lib
+import html as html_lib  # noqa: F401
 # 数据库路径（确保在当前项目目录下）
 DB_PATH = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "code_graph.db"
 )
+
 
 def get_changed_lines():
     """获取变更行数（结合 git diff 统计）"""
@@ -20,11 +21,14 @@ def get_changed_lines():
             parts = line.split("	")
             if len(parts) == 3:
                 added, removed, _ = parts
-                if added.isdigit(): total_changed += int(added)
-                if removed.isdigit(): total_changed += int(removed)
+                if added.isdigit():
+                    total_changed += int(added)
+                if removed.isdigit():
+                    total_changed += int(removed)
         return total_changed
     except Exception:
         return 0
+
 
 def main():
     # 1. 获取函数名（支持命令行参数，没有则提示输入）
@@ -32,7 +36,7 @@ def main():
         changed_func_name = sys.argv[1]
     else:
         changed_func_name = input("请输入变更的函数名: ").strip()
-    
+
     if not changed_func_name:
         print("错误：未输入函数名")
         sys.exit(1)
@@ -42,15 +46,16 @@ def main():
         print(f"正在读取数据库: {DB_PATH}")
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        
+
         # 检查表是否存在
-        tables = cursor.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        tables = cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()
         table_list = [t[0] for t in tables]
         if 'edges' not in table_list or 'nodes' not in table_list:
             print(f"错误：数据库中缺少 edges 或 nodes 表。现有表: {table_list}")
             sys.exit(1)
 
-        # 查询谁调用了这个函数 
+        # 查询谁调用了这个函数
         # edges 表用 caller_id 和 callee_id 关联 nodes 表的 id
         cursor.execute("""
             SELECT DISTINCT caller.name, caller.file_path
@@ -59,14 +64,14 @@ def main():
             JOIN nodes callee ON callee.id = e.callee_id
             WHERE callee.name = ?
         """, (changed_func_name,))
-        
+
         callers = cursor.fetchall()
-        
+
         upstream_files = set()
         for _, file_path in callers:
             if file_path:
                 upstream_files.add(file_path)
-                
+
         conn.close()
     except sqlite3.Error as e:
         print(f"数据库读取失败: {e}")
@@ -85,21 +90,24 @@ def main():
     # 4. 简易风险评级
     changed_lines = get_changed_lines()
     caller_count = len(callers)
-    
+
     if caller_count > 3 or changed_lines > 20:
         risk_level = "高风险 🔴"
     else:
         risk_level = "中低风险 🟢"
-        
+
     print("【风险评级】")
     print(f"调用方数量: {caller_count}")
     print(f"变更行数: {changed_lines}")
     print(f"最终评级: {risk_level}")
 
-def generate_html_report(changed_func_name, callers, upstream_files, risk_level, changed_lines):
+
+def generate_html_report(changed_func_name, callers,
+                         upstream_files, risk_level, changed_lines):
     """生成自包含的 HTML 影响面分析报告"""
-    caller_rows = "".join([f"<tr><td>{c[0]}</td><td>{c[1]}</td></tr>" for c in callers]) or "<tr><td colspan='2'>暂无上游调用方</td></tr>"
-    
+    caller_rows = "".join(
+        [f"<tr><td>{c[0]}</td><td>{c[1]}</td></tr>" for c in callers]) or "<tr><td colspan='2'>暂无上游调用方</td></tr>"
+
     html_content = f"""
     <!DOCTYPE html>
     <html>
@@ -129,6 +137,7 @@ def generate_html_report(changed_func_name, callers, upstream_files, risk_level,
     with open("impact_report.html", "w", encoding="utf-8") as f:
         f.write(html_content)
     print("✅ HTML 报告已生成：impact_report.html")
+
 
 # 在 main() 函数的最末尾调用：
 # generate_html_report(changed_func_name, callers, upstream_files, risk_level, changed_lines)
